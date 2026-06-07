@@ -147,8 +147,10 @@ export default {
                     if(value[i].code !== null && typeof value[i].code !== 'number'){
                         console.error(`[oeb-visualizations warn] code must be null or a number in dataItems prop item (at position ${i})`)
                     }
-                    // Date must be a string containing a date
-                    if(typeof value[i].date !== 'string' || isNaN(Date.parse(value[i].date)) || value[i].date !== 'number'){
+                    // Date must be a string containing a parseable date, or a number (timestamp)
+                    const validDateString = typeof value[i].date === 'string' && !isNaN(Date.parse(value[i].date));
+                    const validDateNumber = typeof value[i].date === 'number';
+                    if(!validDateString && !validDateNumber){
                         console.error(`[oeb-visualizations warn] date must be a string containing a date or a number in dataItems prop item (at position ${i})`)
                         console.error(`[oeb-visualizations warn] date type is ${typeof value[i].date} and the value is ${value[i].date}`)
                     }
@@ -164,8 +166,16 @@ export default {
     },
     mounted() {
 
-        this.max_access_time = Math.max(...this.dataItems.map(item => item.access_time))
-         
+        // Compute the tallest online bar from real measurements only.
+        // Math.max over an array containing null coerces null -> 0, so a site
+        // that was down the whole window would yield 0 and render the
+        // offline/NA bars with zero height (invisible). Ignore nulls/NaN and
+        // apply a floor so down-only sites still draw full-height bars.
+        const times = this.dataItems
+            .map(item => item.access_time)
+            .filter(t => typeof t === 'number' && !isNaN(t));
+        this.max_access_time = times.length ? Math.max(...times) : 100;
+
         var traces = this.buildOnlineTraces(this.dataItems) // generate line traces
         
         traces = traces.concat(this.buildOfflineNATraces(this.dataItems))//  generate bar traces
@@ -289,7 +299,11 @@ export default {
             var nonNullValues = 0;
 
             for(let i=0; i<data.length; i++){
-                if(data[i].access_time !== null){
+                // Only genuine successful measurements belong on the online
+                // line. An error code with a recorded access_time must not
+                // sneak in (it would draw green and skew the average); treat it
+                // as a break, just like a null access_time.
+                if(data[i].access_time !== null && !this.isErrorCode(data[i].code)){
                     // keep adding to subarray
                     subarrayTime.push(data[i].access_time);
                     subarrayDate.push(data[i].date);
@@ -434,6 +448,16 @@ export default {
             return traces;
         },
 
+        isErrorCode(code){
+            /*
+            Returns true if the HTTP code denotes the server being offline.
+            Single source of truth shared by the online-line and offline-bar
+            logic so redness is decided consistently by the response code.
+            */
+            const errorCodes = [400, 403, 404, 408, 500, 502, 503, 504];
+            return errorCodes.includes(code);
+        },
+
         extractOfflineNADates(data) {
             /*
             This function extracts dates with access_time null. 
@@ -443,20 +467,22 @@ export default {
                 - data: array of objects with keys "access_time", "date" and "code". access_time and code can be null
             
             Returns an object with keys:
-                - NA: array of dates with access_time null and code null
-                - down: array of dates with access_time null and code in errorCodes
+                - NA: array of dates with code null (no information available)
+                - down: array of dates with code in errorCodes (server offline)
+
+            Classification is driven by the HTTP code, not by access_time
+            null-ness: an error response that happened to record an access_time
+            is still "offline", and a missing code is "no information available".
             */
-            const errorCodes = [404, 500, 502, 503, 504];
-            
             const resultNA = [];
             const resultOffline = [];
 
             for (let i = 0; i < data.length; i++) {
-                // if the access_time is null and the code is null, it means that the monitoring was down
-                if (data[i].access_time === null && data[i].code === null) {
+                // no code at all -> grey "No information available"
+                if (data[i].code === null) {
                     resultNA.push(data[i].date);
-                // if the access_time is null and the code is in errorCodes, it means that the server is offline
-                }else if(data[i].access_time === null ){
+                // an error code -> red "Offline"
+                }else if(this.isErrorCode(data[i].code)){
                     resultOffline.push(data[i].date);
                 }
             }
