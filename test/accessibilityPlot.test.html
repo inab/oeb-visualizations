@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>accessibilityPlot — local test</title>
+
+    <!-- Externals: must be globals named `Vue` and `Plotly` (see rollup globals) -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.35.2/plotly.js"></script>
+
+    <!-- The locally built UMD bundle. Auto-registers the component on the global Vue.
+         Loaded with a cache-busting query so a plain refresh always picks up a rebuild. -->
+    <script>
+        document.write(
+            '<script src="../dist/oeb-visualizations.umd.js?t=' + Date.now() + '"><\/script>'
+        );
+    </script>
+
+    <style>
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            margin: 24px;
+            color: #222;
+        }
+        h1 { font-size: 18px; }
+        section {
+            margin-bottom: 32px;
+            padding: 12px 16px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+        }
+        h2 { font-size: 14px; margin: 0 0 4px; }
+        p.desc { font-size: 12px; color: #666; margin: 0 0 12px; }
+    </style>
+</head>
+<body>
+    <h1>accessibilityPlot — local build preview</h1>
+    <p class="desc">
+        Renders <code>dist/oeb-visualizations.umd.js</code>. Rebuild with
+        <code>npm run build</code> and refresh to see source changes.
+    </p>
+
+    <div id="app">
+        <section>
+            <h2>1. Reported case (NA before &amp; after online) — overlap fix</h2>
+            <p class="desc">
+                Null placeholders at 00:00, real probes at ~17:00. The right grey
+                block must not bleed into the green online area.
+            </p>
+            <accessibility-plot :data-items="reported"></accessibility-plot>
+        </section>
+
+        <section>
+            <h2>2. Offline (red) blocks adjacent to online</h2>
+            <p class="desc">Error codes render red; check they don't overlap green either.</p>
+            <accessibility-plot :data-items="withOffline"></accessibility-plot>
+        </section>
+
+        <section>
+            <h2>3. Mixed NA + offline + online</h2>
+            <p class="desc">Grey, red and green all in one window.</p>
+            <accessibility-plot :data-items="mixed"></accessibility-plot>
+        </section>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                // The exact dataset from the bug report
+                reported: [
+                    { date: '2026-06-10T00:00:00Z', code: null, access_time: null },
+                    { date: '2026-06-11T00:00:00Z', code: null, access_time: null },
+                    { date: '2026-06-12T17:08:23.109970Z', code: 200, access_time: 0.9881477379240096 },
+                    { date: '2026-06-13T17:01:49.914314Z', code: 200, access_time: 0.9466061540879309 },
+                    { date: '2026-06-14T16:56:37.179417Z', code: 200, access_time: 0.9429883537814021 },
+                    { date: '2026-06-15T17:01:40.060080Z', code: 200, access_time: 0.15245215594768524 },
+                    { date: '2026-06-16T16:55:44.283186Z', code: 200, access_time: 0.9602258298546076 },
+                    { date: '2026-06-17T00:00:00Z', code: null, access_time: null }
+                ],
+                withOffline: [
+                    { date: '2026-06-10T17:00:00Z', code: 200, access_time: 0.92 },
+                    { date: '2026-06-11T17:00:00Z', code: 200, access_time: 0.81 },
+                    { date: '2026-06-12T17:00:00Z', code: 503, access_time: null },
+                    { date: '2026-06-13T17:00:00Z', code: 503, access_time: null },
+                    { date: '2026-06-14T17:00:00Z', code: 200, access_time: 0.88 },
+                    { date: '2026-06-15T17:00:00Z', code: 200, access_time: 0.95 }
+                ],
+                mixed: [
+                    { date: '2026-06-10T00:00:00Z', code: null, access_time: null },
+                    { date: '2026-06-11T17:00:00Z', code: 200, access_time: 0.90 },
+                    { date: '2026-06-12T17:00:00Z', code: 200, access_time: 0.70 },
+                    { date: '2026-06-13T17:00:00Z', code: 500, access_time: null },
+                    { date: '2026-06-14T00:00:00Z', code: null, access_time: null },
+                    { date: '2026-06-15T17:00:00Z', code: 200, access_time: 0.85 },
+                    { date: '2026-06-16T16:55:00Z', code: 200, access_time: 0.93 },
+                    { date: '2026-06-17T00:00:00Z', code: null, access_time: null }
+                ]
+            }
+        });
+    </script>
+</body>
+</html>
