@@ -304,9 +304,11 @@ export default {
                 // sneak in (it would draw green and skew the average); treat it
                 // as a break, just like a null access_time.
                 if(data[i].access_time !== null && !this.isErrorCode(data[i].code)){
-                    // keep adding to subarray
+                    // keep adding to subarray. Snap the x to the day centre so
+                    // the online marker sits in the middle of its day, on the
+                    // same grid as the offline/NA bars.
                     subarrayTime.push(data[i].access_time);
-                    subarrayDate.push(data[i].date);
+                    subarrayDate.push(this.dayCenter(data[i].date));
                     sum += data[i].access_time;
                     nonNullValues += 1;
 
@@ -458,32 +460,67 @@ export default {
             return errorCodes.includes(code);
         },
 
+        dayCenter(date) {
+            /*
+            Snaps a date to the centre (12:00) of its UTC calendar day, returned
+            as ms since epoch. The whole chart is a daily grid: null placeholders
+            arrive at 00:00Z and real probes mid-afternoon, so aligning every
+            point and every bar to the day centre keeps them on one grid. That is
+            what makes blocks sit centred on their day and prevents bars from
+            bleeding into a neighbouring day's measurement.
+            */
+            const d = new Date(date);
+            d.setUTCHours(0, 0, 0, 0);
+            return d.getTime() + (1000 * 3600 * 24) / 2;
+        },
+
+        computeDaySlots(data) {
+            /*
+            Returns, for every data point, the bar slot it should occupy: a full
+            calendar day centred on that day (see dayCenter). Consecutive
+            offline/NA days therefore tile into a single block, and because every
+            online point is snapped to the same daily grid a bar never overlaps a
+            measurement.
+
+            Arguments:
+                - data: array of objects with a "date" key
+
+            Returns an array (parallel to data) of objects with keys:
+                - center: slot centre (day centre), in ms since epoch
+                - width: slot width, in ms (one full day)
+            */
+            const DAY = 1000 * 3600 * 24;
+            return data.map(item => ({ center: this.dayCenter(item.date), width: DAY }));
+        },
+
         extractOfflineNADates(data) {
             /*
-            This function extracts dates with access_time null. 
-            Depending on the code, the server is offline or NA on those dates.
+            This function extracts the bar slots of points with no successful
+            measurement. Depending on the code, the server is offline or NA on
+            those dates.
 
             Arguments:
                 - data: array of objects with keys "access_time", "date" and "code". access_time and code can be null
-            
+
             Returns an object with keys:
-                - NA: array of dates with code null (no information available)
-                - down: array of dates with code in errorCodes (server offline)
+                - NA: array of slots (see computeDaySlots) for code null (no information available)
+                - down: array of slots for code in errorCodes (server offline)
 
             Classification is driven by the HTTP code, not by access_time
             null-ness: an error response that happened to record an access_time
             is still "offline", and a missing code is "no information available".
             */
+            const slots = this.computeDaySlots(data);
             const resultNA = [];
             const resultOffline = [];
 
             for (let i = 0; i < data.length; i++) {
                 // no code at all -> grey "No information available"
                 if (data[i].code === null) {
-                    resultNA.push(data[i].date);
+                    resultNA.push(slots[i]);
                 // an error code -> red "Offline"
                 }else if(this.isErrorCode(data[i].code)){
-                    resultOffline.push(data[i].date);
+                    resultOffline.push(slots[i]);
                 }
             }
             return {
@@ -496,10 +533,12 @@ export default {
             /*
             This function builds a bar trace.
             Arguments:
-                - data: object with keys "dates" and "access_times"
-                    - dates: array of dates
+                - data: object with keys "dates", "access_times", "colors" and "widths"
+                    - dates: array of dates (slot centres, in ms)
                     - access_times: array of access_times
                     - colors: array of colors in rgba format (eg:"rgba(255, 153, 145,0.8)")
+                    - widths: array of per-bar widths in ms, so each bar fills its
+                      own time slot (see computeDaySlots) instead of a fixed day
                 - name: name of the trace
             */
             const trace = {
@@ -514,21 +553,20 @@ export default {
                 showlegend: showlegend,
                 hoverinfo: hoverinfo,
                 hovertemplate: hovertemplate,
-                width: 1000 * 3600 * 24 * 1 // 100% of the space between two dates
+                width: data.widths
             };
-            console.log(trace)
             return trace;
         },
 
-        buildBarTraces(dates, color, label, group){
+        buildBarTraces(slots, color, label, group){
             /*
             This function builds the series used to display the offline/NA bars.
-            For each date, two columns are created: one very short and one tall. 
-            These columns cover the whole plot height. 
-            The tall column is colored with colorStrong and the short one with colorLight.
+            For each slot two stacked columns are created that together span the
+            whole plot height: a thin strong-coloured band sitting on the axis,
+            and a light-coloured column filling the rest of the height above it.
 
             Arguments:
-                - dates: array of dates
+                - slots: array of slots ({ center, width }), see computeDaySlots
                 - color: color of the bars
 
             Returns array with offline and NA traces
@@ -538,15 +576,26 @@ export default {
             const colorStrong = `rgba(${color},.8)`
             const colorLight = `rgba(${color},.2)`
 
+            const centers = slots.map(s => s.center)
+            const widths = slots.map(s => s.width)
+
+            // Total background height (keeps the previous y-axis extent). The
+            // strong colour is a thin band on the axis; the light colour fills
+            // the remaining height stacked on top of it.
+            const totalHeight = 2 + this.max_access_time * 1.1
+            const baseHeight = totalHeight * 0.03
+
             const dataShort = {
-                dates: dates,
-                access_times: Array(dates.length).fill(2),
-                colors: Array(dates.length).fill(colorStrong)
+                dates: centers,
+                access_times: Array(slots.length).fill(baseHeight),
+                colors: Array(slots.length).fill(colorStrong),
+                widths: widths
             }
             const dataTall = {
-                dates: dates,
-                access_times: Array(dates.length).fill(this.max_access_time * 1.1),
-                colors: Array(dates.length).fill(colorLight)
+                dates: centers,
+                access_times: Array(slots.length).fill(totalHeight - baseHeight),
+                colors: Array(slots.length).fill(colorLight),
+                widths: widths
             }
             const hovertemplate = `<b>${label}</b><br>%{x|%d %b %Y}<br>%{y} ms <extra></extra>`
 
@@ -573,13 +622,11 @@ export default {
             // Down arrays
             if(arrays.down.length > 0){
                 traces = traces.concat(this.buildBarTraces(arrays.down, this.colorOffline, 'Offline', 'down'))
-                console.log(arrays.down)
             }
             // NA arrays
             if(arrays.NA.length > 0){
                 traces = traces.concat(this.buildBarTraces(arrays.NA, this.colorNA, 'No information available', 'na'))
-                console.log(arrays.NA)
-            }                        
+            }
         
             return traces;
         },
@@ -631,7 +678,10 @@ export default {
                 console.log('six months ago: ' + new Date(lastDate.setMonth(lastDate.getMonth() - 6)))
                 return new Date(lastDate.setMonth(lastDate.getMonth() - 6))
             }else{
-                return this.dataItems[0]
+                // Anchor day ticks at the day centre (noon) so each label sits
+                // under the middle of its day block, aligned with the online dot
+                // (which is snapped to the same day centre).
+                return this.dayCenter(this.dataItems[0].date)
             }
         },
 
@@ -643,11 +693,17 @@ export default {
             }
         },
         xaxisRange(){
-            if(!this.xrange){
-                return [this.dataItems[0], this.dataItems[this.dataItems.length - 1]]
-            }else{
+            if(this.xrange){
                 return this.xrange
             }
+            // Span whole calendar days so the first and last day blocks (which
+            // are centred on their day, one full day wide) are fully visible.
+            const DAY = 1000 * 3600 * 24;
+            const firstDay = new Date(this.dataItems[0].date);
+            firstDay.setUTCHours(0, 0, 0, 0);
+            const lastDay = new Date(this.dataItems[this.dataItems.length - 1].date);
+            lastDay.setUTCHours(0, 0, 0, 0);
+            return [firstDay.getTime(), lastDay.getTime() + DAY]
         },
         monthTickVales(){
             // First day of month of last date and previous five months
