@@ -1,6 +1,6 @@
 {
   "name": "@inb/oeb_visualizations",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Collection of Vue components for data visualization in OpenEBench.",
   "author": "evamart",
   "license": "MIT",

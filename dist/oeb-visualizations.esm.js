@@ -846,6 +846,14 @@ var script = {
       type: Boolean,
       required: false,
       default: false
+    },
+    line: {
+      type: Object,
+      required: false,
+      default: () => ({
+        dash: 'solid',
+        width: 1.8
+      })
     }
   },
   mounted() {
@@ -921,8 +929,8 @@ var script = {
             size: 5
           },
           line: {
-            color: this.colors[i],
-            width: 1.8
+            ...this.line,
+            color: this.colors[i]
           },
           stackgroup: this.stack ? 'one' : null
         };

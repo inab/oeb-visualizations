@@ -40,6 +40,7 @@ Data is provided to the component as an array of objects through the `dataTraces
 | xaxisTitle | String | Title of the x axis. | Year | false |
 | yaxisTitle | String | Title of the y axis. | Number of citations | false |
 | dark | Boolean | If true, the plot will be displayed in dark mode. | false | false |
+| line | Object | Plotly line style dictionary applied to every trace, e.g. `{ dash: 'solid', width: 4 }`. `color` is ignored here (use `colors`). | `{ dash: 'solid', width: 1.8 }` | false |
 
 ## Usage
 

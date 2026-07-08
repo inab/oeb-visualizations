@@ -836,6 +836,14 @@ var script = {
       type: Boolean,
       required: false,
       default: false
+    },
+    line: {
+      type: Object,
+      required: false,
+      default: () => ({
+        dash: 'solid',
+        width: 1.8
+      })
     }
   },
   mounted() {
@@ -911,8 +919,8 @@ var script = {
             size: 5
           },
           line: {
-            color: this.colors[i],
-            width: 1.8
+            ...this.line,
+            color: this.colors[i]
           },
           stackgroup: this.stack ? 'one' : null
         };
@@ -949,7 +957,7 @@ const __vue_inject_styles__ = undefined;
 /* scoped */
 const __vue_scope_id__ = undefined;
 /* module identifier */
-const __vue_module_identifier__ = "data-v-4ac5e814";
+const __vue_module_identifier__ = "data-v-7dba51b0";
 /* functional template */
 const __vue_is_functional_template__ = false;
 /* style inject */

@@ -1,3 +1,9 @@
+## 0.1.3 (2026-07-08)
+
+### Feat
+
+- **citationsPlot**: add `line` prop to customize trace line style (dash, width)
+
 ## 0.1.1 (2026-06-07)
 
 ### Fix

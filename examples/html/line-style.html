@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>citationsPlot — line style prop example</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+    <!-- Load the LOCAL build so the new `line` prop is available.
+         Run `npm run build` first to (re)generate dist/. -->
+    <script src="../../dist/oeb-visualizations.min.js"></script>
+
+    <link href="./index.css" rel="stylesheet">
+    <script type="text/javascript" src="./data.js"></script>
+
+</head>
+<body>
+  <div id="app">
+    <h1>citationsPlot: <code>line</code> style prop</h1>
+
+    <div>
+      <h3>Default line (no <code>line</code> prop) — solid, width 1.8</h3>
+      <div class="container">
+        <citations-plot :data-traces="dataToPlot"></citations-plot>
+      </div>
+    </div>
+
+    <div>
+      <h3>Custom line: <code>{ dash: 'dash', width: 4 }</code></h3>
+      <div class="container">
+        <citations-plot :data-traces="dataToPlot" :line="customLine"></citations-plot>
+      </div>
+    </div>
+
+    <div>
+      <h3>Custom line: <code>{ dash: 'dot', width: 2 }</code></h3>
+      <div class="container">
+        <citations-plot :data-traces="dataToPlot" :line="dottedLine"></citations-plot>
+      </div>
+    </div>
+  </div>
+</body>
+<script>
+
+  // the data to plot is in data.js
+  const dataImported = [ traceData1, traceData2, traceData3 ]
+
+  // register the component (the bundle also auto-installs via Vue.use)
+  Vue.component('citations-plot', oeb_visualizations.citationsPlot)
+
+  // create a new Vue instance
+  let app = new Vue({
+    el: '#app',
+    data: {
+      dataToPlot: dataImported,
+      customLine: { dash: 'dash', width: 4 },
+      dottedLine: { dash: 'dot', width: 2 }
+    }
+  })
+
+</script>
+</html>
